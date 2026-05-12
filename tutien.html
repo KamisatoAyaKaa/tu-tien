@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tu Tiên Lộ - Bí Cảnh Ẩn Thế</title>
+    <style>
+        :root {
+            --bg: #0d0d0d;
+            --panel: #1a1a1d;
+            --text: #cdcdcd;
+            --gold: #f1c40f;
+            --purple: #9b59b6;
+            --red: #e74c3c;
+            --green: #2ecc71;
+            --blue: #3498db;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', serif;
+            margin: 0;
+        }
+
+        /* Layout chính */
+        #game-outer {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 700px;
+            background: var(--panel);
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            position: relative;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+
+        /* MÀN HÌNH KHỞI ĐẦU DÀI ĐỂ CUỘN */
+        #setup-screen {
+            position: relative;
+            min-height: 1200px;
+            /* Tạo độ dài để phải cuộn */
+            text-align: center;
+        }
+
+        .scroll-hint {
+            color: #444;
+            margin-top: 100px;
+            font-style: italic;
+        }
+
+        /* NÚT BÍ MẬT Ở GÓC DƯỚI PHẢI */
+        .btn-cheat {
+            position: absolute;
+            right: 10px;
+            bottom: 20px;
+            background: rgba(142, 68, 173, 0.2);
+            /* Mờ ảo lúc đầu */
+            color: #555;
+            border: 1px solid #333;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.5s;
+            font-size: 0.8em;
+            text-decoration: none;
+        }
+
+        .btn-cheat:hover {
+            background: linear-gradient(45deg, #8e44ad, #c0392b);
+            color: #fff;
+            border-color: var(--gold);
+            box-shadow: 0 0 20px var(--gold);
+            transform: scale(1.1);
+        }
+
+        /* Stats & Game UI */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: #25252b;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--gold);
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #888;
+            display: block;
+        }
+
+        .log-box {
+            height: 350px;
+            overflow-y: auto;
+            background: #000;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button:not(.btn-cheat) {
+            background: #2d3436;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        button:not(.btn-cheat):hover {
+            background: #444;
+        }
+
+        .btn-major {
+            background: #d35400;
+            grid-column: span 2;
+            display: none;
+            margin-top: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        /* Hiệu ứng màu */
+        .highlight {
+            color: var(--gold);
+        }
+
+        .wisdom {
+            color: var(--blue);
+        }
+
+        .success {
+            color: var(--green);
+        }
+
+        .danger {
+            color: var(--red);
+        }
+
+        .godly {
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+            font-weight: bold;
+        }
+
+        .faction-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+
+        .faction-modal.show {
+            display: flex;
+        }
+
+        .faction-modal-content {
+            width: min(520px, 92vw);
+            background: #1f1f24;
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+        }
+
+        .faction-modal-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-outer">
+        <div id="game-container">
+            <div class="header">
+                <h1 style="color: var(--gold); margin: 0;">TU TIÊN LỘ</h1>
+                <p>Bản: Bí Cảnh Ẩn Thế</p>
+            </div>
+
+            <div id="setup-screen">
+                <div id="trait-display"
+                    style="background:#25252b; padding:20px; border-radius:10px; margin-bottom:20px; border:1px dashed var(--gold);">
+                    <h3 id="init-lc" class="highlight">Linh Căn: ???</h3>
+                    <h3 id="init-wisdom" class="wisdom">Ngộ Tính: ???</h3>
+                    <h3 id="init-kv" style="color:var(--purple)">Khí Vận: ???</h3>
+                </div>
+
+                <button onclick="rollFate()" style="background:var(--green); width:100%;">Gieo Quẻ (Ngẫu Nhiên)</button>
+                <button id="start-btn" onclick="startGame()"
+                    style="display:none; width:100%; background:var(--blue); margin-top:10px;">Bắt Đầu Luân Hồi</button>
+
+
+                <button onclick="godMode()" class="btn-cheat">⚡ Nghịch Thiên ⚡</button>
+            </div>
+
+            <div id="play-screen" style="display:none;">
+                <div class="stats-grid">
+                    <div class="stat-item"><span class="stat-label">Cảnh Giới</span><span id="rank-txt"
+                            class="highlight">--</span></div>
+                    <div class="stat-item"><span class="stat-label">Linh Lực</span><span id="mana-txt">0</span> / <span
+                            id="max-mana-txt">--</span></div>
+                    <div class="stat-item"><span class="stat-label">Linh Căn</span><span id="lc-txt">--</span></div>
+                    <div class="stat-item"><span class="stat-label">Ngộ Tính</span><span id="wisdom-txt"
+                            class="wisdom">--</span></div>
+                    <div class="stat-item"><span class="stat-label">Thọ Nguyên</span><span id="age-txt">--</span> /
+                        <span id="max-age-txt">--</span>
+                    </div>
+                    <div class="stat-item"><span class="stat-label">Khí Vận</span><span id="kv-txt"
+                            style="color:var(--purple)">--</span></div>
+                </div>
+                <div id="log" class="log-box"></div>
+                <div class="action-grid">
+                    <button onclick="train()">Tu Luyện</button>
+                    <button onclick="explore()">Tìm Kỳ Ngộ</button>
+                    <button id="break-btn" class="btn-major" onclick="handleBreakthrough()"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="faction-modal" class="faction-modal">
+        <div class="faction-modal-content">
+            <h3 class="highlight" style="margin: 0 0 8px 0;">Kì Ngộ Xuất Hiện</h3>
+            <p style="margin: 0;">Cơ duyên đã tới. Ngươi muốn chọn con đường nào?</p>
+            <div class="faction-modal-actions">
+                <button onclick="selectFactionByButton('CHINH')" style="background:var(--blue);">Gia nhập Chính Đạo</button>
+                <button onclick="selectFactionByButton('MA')" style="background:var(--red);">Bước vào Ma Đạo</button>
+                <button onclick="selectFactionByButton('NONE')">Giữ thân Tản Tu</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+  const RANDOM_QUOTES = [
+    "Cảm nhận linh khí xung quanh thật dồi dào...",
+    "Con đường tu tiên thật lắm gian nan.",
+    "Hình như ta vừa cảm nhận được một luồng ý niệm của đại năng đi ngang qua.",
+    "Hôm nay tâm tình bất định, khó lòng nhập định.",
+    "Thế gian vạn vật, tất cả đều là hư ảo.",
+    "Ta phải nhanh chóng đột phá, thời gian không còn nhiều nữa..."
+  ];
+
+  const LINH_CAN = [
+    { name: "Phế linh căn", multi: 0.8, color: "#7f8c8d" },
+    { name: "Tam linh căn", multi: 2.0, color: "#3498db" },
+    { name: "Song linh căn", multi: 5.0, color: "#2ecc71" },
+    { name: "Đơn linh căn", multi: 12.0, color: "#f1c40f" },
+    { name: "Thiên linh căn", multi: 30.0, color: "#e67e22" }
+  ];
+
+  const KHI_VAN = [
+    { name: "Thiên mệnh khí vận", breakBonus: 0.2, ageBonus: 10 },
+    { name: "Long khí", wisdomBonus: 30 },
+    { name: "Sát khí", multiBonus: 1.8 },
+    { name: "Đào hoa khí", luckyBonus: 0.3 },
+    { name: "Ma vận", multiBonus: 2.5, breakBonus: -0.1 },
+    { name: "Phật vận", ageBonus: 10, wisdomBonus: 20 },
+    { name: "Khí vận chi tử", breakBonus: 0.5, ageBonus: 20, luckyBonus: 0.6 }
+  ];
+
+  const FACTIONS = {
+    NONE: { name: "Tản Tu", breakMod: 0, trainMod: 1.0, npcLuck: 0, color: "#cdcdcd" },
+    CHINH: { name: "Chính Đạo", breakMod: 0.1, trainMod: 1.0, npcLuck: 0.2, color: "#3498db" },
+    MA: { name: "Ma Đạo", breakMod: -0.15, trainMod: 1.6, npcLuck: -0.2, color: "#e74c3c" }
+  };
+
+  const STAGES = [
+    { name: "Luyện Khí", mana: 100, age: 100, speed: 1 },
+    { name: "Trúc Cơ", mana: 3000, age: 250, speed: 15 },
+    { name: "Kim Đan", mana: 40000, age: 500, speed: 100 },
+    { name: "Nguyên Anh", mana: 300000, age: 1000, speed: 600 },
+    { name: "Hóa Thần", mana: 2500000, age: 3000, speed: 4500 },
+    { name: "Luyện Hư", mana: 15000000, age: 8000, speed: 30000 },
+    { name: "Hợp Thể", mana: 100000000, age: 20000, speed: 200000 },
+    { name: "Đại Thừa", mana: 800000000, age: 100000, speed: 1500000 },
+    { name: "Độ Kiếp", mana: 5000000000, age: 500000, speed: 10000000 }
+  ];
+
+  let p = {
+    stage: 0,
+    level: 1,
+    mana: 0,
+    age: 18,
+    maxAge: 0,
+    wisdom: 0,
+    lc: {},
+    kv: {},
+    faction: FACTIONS.NONE,          // Khởi đầu: Tản Tu (chưa nhập phe)
+    factionProbation: 0,             // >0 nghĩa là đang “nhập môn” Chính Đạo, dễ bị phản bội
+    pendingFactionChoice: false,
+    isDead: false
+  };
+
+  function rollFate() {
+    p.lc = LINH_CAN[Math.floor(Math.random() * LINH_CAN.length)];
+    p.kv = KHI_VAN[Math.floor(Math.random() * KHI_VAN.length)];
+    p.wisdom = Math.floor(Math.random() * 60) + 20;
+
+    // Reset phe về Tản Tu mỗi lần gieo quẻ
+    p.faction = FACTIONS.NONE;
+    p.factionProbation = 0;
+
+    updateInitUI();
+    document.getElementById("start-btn").style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function godMode() {
+    p.lc = LINH_CAN.find(l => l.name === "Thiên linh căn");
+    p.kv = KHI_VAN.find(k => k.name === "Khí vận chi tử");
+    p.wisdom = 100;
+    p.faction = FACTIONS.NONE;
+    p.factionProbation = 0;
+
+    updateInitUI();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.getElementById("trait-display").style.border = "2px solid #ff00ff";
+    document.getElementById("start-btn").style.display = "block";
+  }
+
+  function updateInitUI() {
+    document.getElementById("init-lc").innerText = "Linh Căn: " + (p.lc?.name ?? "???");
+    document.getElementById("init-lc").style.color = p.lc?.color ?? "#cdcdcd";
+    document.getElementById("init-wisdom").innerText = "Ngộ Tính: " + (p.wisdom ?? "???");
+    document.getElementById("init-kv").innerText = "Khí Vận: " + (p.kv?.name ?? "???");
+  }
+
+  function startGame() {
+    if (!p.lc?.name || !p.kv?.name) {
+      alert("Hãy Gieo Quẻ trước đã!");
+      return;
+    }
+
+    document.getElementById("setup-screen").style.display = "none";
+    document.getElementById("play-screen").style.display = "block";
+
+    // Tính toán chỉ số ban đầu
+    p.maxAge = STAGES[0].age + (p.kv.ageBonus || 0);
+    if (p.kv.wisdomBonus) p.wisdom += p.kv.wisdomBonus;
+
+    document.getElementById("lc-txt").innerText = p.lc.name;
+    document.getElementById("lc-txt").style.color = p.lc.color;
+    document.getElementById("wisdom-txt").innerText = p.wisdom;
+    document.getElementById("kv-txt").innerText = `${p.kv.name} | ${p.faction.name}`;
+
+    writeLog(`Hành trình bắt đầu. Ngươi là một ${p.faction.name} mang ${p.lc.name}...`);
+    updateUI();
+  }
+
+  function updateUI() {
+    const cur = STAGES[p.stage];
+
+    if (Math.random() < 0.2) {
+      const subHeader = document.querySelector(".header p");
+      if (subHeader) subHeader.innerText = RANDOM_QUOTES[Math.floor(Math.random() * RANDOM_QUOTES.length)];
+    }
+
+    document.getElementById("rank-txt").innerText = `${cur.name} Tầng ${p.level}`;
+    document.getElementById("mana-txt").innerText = Math.floor(p.mana).toLocaleString();
+    document.getElementById("max-mana-txt").innerText = cur.mana.toLocaleString();
+    document.getElementById("age-txt").innerText = p.age.toFixed(1);
+    document.getElementById("max-age-txt").innerText = p.maxAge;
+
+    const rankTxt = document.getElementById("rank-txt");
+    const factionTxt = document.getElementById("kv-txt");
+
+    rankTxt.style.color = p.faction.color;
+    factionTxt.innerText = `${p.kv.name} | ${p.faction.name}`;
+
+    const btn = document.getElementById("break-btn");
+    if (p.mana >= cur.mana) {
+      btn.style.display = "block";
+      if (p.stage === STAGES.length - 1 && p.level === 10) {
+        btn.innerText = "✨ PHI THĂNG TIÊN GIỚI ✨";
+      } else if (p.level === 10) {
+        btn.innerText = `⭐ ĐỘT PHÁ ${STAGES[p.stage + 1].name} ⭐`;
+      } else {
+        btn.innerText = `Phá Cảnh Tầng ${p.level + 1}`;
+      }
+    } else {
+      btn.style.display = "none";
+    }
+
+    if (p.age >= p.maxAge && !p.isDead) {
+      p.isDead = true;
+      writeLog("Đèn cạn dầu tắt... Trăm năm tu hành hóa thành cát bụi.", "danger");
+      setTimeout(() => { if (confirm("THÂN TỬ ĐẠO TIÊU. Luân hồi chuyển kiếp?")) location.reload(); }, 500);
+    }
+  }
+
+  function train() {
+    if (p.isDead) return;
+    const cur = STAGES[p.stage];
+
+    let baseAgeCost = 0.5;
+    // Khí vận chi tử tu luyện nhanh hơn 20%
+    if (p.kv.name === "Khí vận chi tử") baseAgeCost *= 0.8;
+
+    let actualAgeCost = parseFloat((baseAgeCost / (p.wisdom / 50)).toFixed(2));
+    actualAgeCost = Math.max(0.1, Math.min(2.0, actualAgeCost));
+
+    let gain =
+      (Math.random() * 5 + 5) *
+      p.lc.multi *
+      cur.speed *
+      (p.kv.multiBonus || 1) *
+      p.faction.trainMod;
+
+    if (Math.random() < (p.wisdom / 800)) {
+      gain *= 15;
+      writeLog(`✨ <b>NGỘ ĐẠO!</b> Linh lực +${Math.floor(gain).toLocaleString()} (Tốn ${actualAgeCost} năm)`, "wisdom");
+    } else {
+      writeLog(`Tu luyện, linh lực +${Math.floor(gain).toLocaleString()} (Tốn ${actualAgeCost} năm)`);
+    }
+
+    p.mana += gain;
+    p.age += actualAgeCost;
+    updateUI();
+  }
+
+  function explore() {
+    if (p.isDead) return;
+    if (p.pendingFactionChoice) {
+      writeLog("Hãy chọn phe từ kì ngộ trước khi tiếp tục lịch lãm.", "highlight");
+      return;
+    }
+
+    let percentLost = (Math.random() * (0.05 - 0.01) + 0.01);
+    let ageLost = p.maxAge * percentLost;
+    if (p.kv.name === "Khí vận chi tử") ageLost *= 0.5;
+    p.age += ageLost;
+
+    let npcRoll = Math.random();
+
+    // Đầu game ưu tiên “kì ngộ nhập phe” khi còn Tản Tu
+    const earlyGame = (p.stage === 0 && p.level <= 4);
+    const joinChance = earlyGame ? 0.35 : 0.12;
+
+    if (p.faction === FACTIONS.NONE && Math.random() < joinChance) {
+      handleFactionEvents({ forceJoin: true });
+    } else if (npcRoll > 0.85) {
+      handleFactionEvents();
+    } else if (npcRoll > 0.6) {
+      handleNPC(STAGES[p.stage].mana, (p.lc.multi / 5));
+    } else {
+      writeLog(`Lịch lãm ${ageLost.toFixed(1)} năm, chỉ thấy gió bụi mịt mù.`);
+    }
+
+    updateUI();
+  }
+
+  function handleFactionEvents(opts = {}) {
+    const forceJoin = !!opts.forceJoin;
+
+    // 1) Ra nhập phe diễn ra trong quá trình “Tìm Kỳ Ngộ” (đầu game)
+    if (p.faction === FACTIONS.NONE) {
+      if (!forceJoin && Math.random() < 0.4) {
+        writeLog("Kì ngộ thoáng qua... nhưng cơ duyên chưa chín.", "");
+        return;
+      }
+
+      showFactionChoiceModal();
+      return;
+    }
+
+    // 2) Trong quá trình tham gia Chính Đạo có thể bị phản bội -> đổi sang Ma Đạo
+    if (p.faction === FACTIONS.CHINH) {
+      const betrayChance = (p.factionProbation > 0) ? 0.22 : 0.10; // nhập môn dễ bị hãm hại hơn
+      if (Math.random() < betrayChance) {
+        p.faction = FACTIONS.MA;
+        p.factionProbation = 0;
+        p.mana = 0;
+        p.wisdom += 10;
+        writeLog(
+          `💢 <b>PHẢN BỘI:</b> Đồng môn hãm hại, trưởng bối quay lưng! Ngươi bị ép rơi xuống vực sâu... <b>NGƯƠI ĐÃ HÓA MA!</b>`,
+          "danger"
+        );
+        document.getElementById("game-container").style.boxShadow = "0 0 40px #e74c3c";
+        return;
+      }
+
+      if (p.factionProbation > 0) {
+        p.factionProbation--;
+        if (p.factionProbation === 0) {
+          writeLog(`⭐ <b>CHÍNH THỨC:</b> Trải qua khảo hạch, ngươi chính thức trở thành đệ tử Chính Đạo.`, "success");
+        } else {
+          writeLog("Trong sơn môn sóng ngầm cuộn trào... ngươi phải cẩn trọng.", "");
+        }
+        return;
+      }
+    }
+
+    writeLog("Lịch lãm chốn thâm sơn, tâm cảnh có chút biến hóa.");
+  }
+
+  function showFactionChoiceModal() {
+    p.pendingFactionChoice = true;
+    writeLog("✨ Kì ngộ mở ra trước mắt. Hãy chọn phe bằng các nút hiển thị.", "highlight");
+    const modal = document.getElementById("faction-modal");
+    modal.classList.add("show");
+  }
+
+  function hideFactionChoiceModal() {
+    const modal = document.getElementById("faction-modal");
+    modal.classList.remove("show");
+  }
+
+  function selectFactionByButton(choice) {
+    if (!p.pendingFactionChoice) return;
+
+    if (choice === "CHINH") {
+      p.faction = FACTIONS.CHINH;
+      p.factionProbation = 6;
+      writeLog(
+        `✨ <b>KÌ NGỘ ĐẦU GAME:</b> Ngươi lạc vào sơn môn, được trưởng lão thu nhận làm đệ tử ngoại môn. <b>Gia nhập Chính Đạo (đang nhập môn)</b>!`,
+        "success"
+      );
+    } else if (choice === "MA") {
+      p.faction = FACTIONS.MA;
+      p.factionProbation = 0;
+      writeLog(
+        `🔥 <b>KÌ NGỘ ĐẦU GAME:</b> Ngươi nhặt được Ma công tuyệt thế, huyết khí sôi trào. <b>Bước chân vào Ma Đạo</b>!`,
+        "danger"
+      );
+      document.getElementById("game-container").style.boxShadow = "0 0 40px #e74c3c";
+    } else {
+      p.faction = FACTIONS.NONE;
+      p.factionProbation = 0;
+      writeLog("Ngươi từ chối gia nhập phe phái, tiếp tục làm một Tản Tu tự do.", "");
+    }
+
+    p.pendingFactionChoice = false;
+    hideFactionChoiceModal();
+    updateUI();
+  }
+
+  function handleNPC(curStageMana, lcScale) {
+    let goodChance = 0.5 + (p.faction.npcLuck || 0);
+    const isGood = Math.random() < goodChance;
+
+    if (isGood) {
+      const goodNPCs = [
+        { name: "Thần Y", msg: "'Tặng ngươi Thọ Diên Đan!'", effect: () => { p.age = Math.max(18, p.age - 20); writeLog("Trẻ lại 20 năm!"); } },
+        { name: "Đại Năng", msg: "'Truyền ngươi Tiên khí!'", effect: () => { p.mana += curStageMana * 5; writeLog("Nhận lượng lớn tu vi."); } },
+        { name: "Lão Nhân", msg: "'Tặng ngươi bí tịch.'", effect: () => { p.wisdom += 5; writeLog("Ngộ tính +5."); } }
+      ];
+      let npc = goodNPCs[Math.floor(Math.random() * goodNPCs.length)];
+      writeLog(`[${p.faction.name}] Gặp <b>${npc.name}</b>: ${npc.msg}`, "success");
+      npc.effect();
+    } else {
+      const badNPCs = [
+        { name: "Ma Quân", msg: "'Nộp thọ nguyên đây!'", effect: () => { let d = parseFloat(((p.maxAge - p.age) * 0.1).toFixed(1)); p.age += d; writeLog(`Mất ${d} tuổi!`); } },
+        { name: "Tà Tu", msg: "'Phế tu vi ngươi!'", effect: () => { if (p.level > 1) p.level--; p.mana = 0; writeLog("Rớt tầng!"); } },
+        { name: "Đạo Tặc", msg: "'Cướp sạch!'", effect: () => { p.mana = 0; writeLog("Mất trắng linh lực."); } }
+      ];
+      let npc = badNPCs[Math.floor(Math.random() * badNPCs.length)];
+      if (p.wisdom > Math.random() * 180) {
+        writeLog(`Nhờ thông tuệ, ngươi né được ${npc.name}!`, "wisdom");
+      } else {
+        writeLog(`Gặp <b>${npc.name}</b>: ${npc.msg}`, "danger");
+        npc.effect();
+      }
+    }
+  }
+
+  function handleBreakthrough() {
+    if (p.isDead) return;
+    const isMajor = (p.level === 10);
+    let chance = (isMajor ? 0.3 : 0.8) + (p.kv.breakBonus || 0) + (p.wisdom / 1000) + (p.faction.breakMod || 0);
+
+    if (Math.random() < chance) {
+      if (isMajor) {
+        p.stage++;
+        p.level = 1;
+        p.maxAge = STAGES[p.stage].age + (p.kv.ageBonus || 0);
+        writeLog(`⭐ ĐỘT PHÁ: ${STAGES[p.stage].name}!`, "godly");
+      } else {
+        p.level++;
+        writeLog(`Lên tầng ${p.level}.`);
+      }
+      p.mana = p.mana * (p.wisdom / 250);
+    } else {
+      p.mana *= 0.5;
+      p.age += 3;
+      writeLog("THẤT BẠI!", "danger");
+    }
+    updateUI();
+  }
+
+  function writeLog(msg, className = "") {
+    const log = document.getElementById("log");
+    const pTag = document.createElement("p");
+    pTag.className = className;
+    pTag.innerHTML = `[${p.age.toFixed(0)} tuổi] ${msg}`;
+    log.prepend(pTag);
+  }
+</script>
+</body>
+
+</html>
