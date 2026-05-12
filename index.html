@@ -48,11 +48,10 @@
             padding-bottom: 10px;
         }
 
-        /* MÀN HÌNH KHỞI ĐẦU DÀI ĐỂ CUỘN */
+        /* Màn hình khởi đầu */
         #setup-screen {
             position: relative;
-            min-height: 1200px;
-            /* Tạo độ dài để phải cuộn */
+            min-height: auto;
             text-align: center;
         }
 
@@ -200,6 +199,26 @@
             grid-template-columns: 1fr;
             gap: 10px;
             margin-top: 12px;
+        }
+
+        /* Tối ưu hiển thị mobile: vừa khung nhìn, không dư khoảng trống */
+        @media (max-width: 768px) {
+            #game-outer {
+                padding: 0;
+                min-height: 100dvh;
+            }
+
+            #game-container {
+                min-height: 100dvh;
+                border-radius: 0;
+                padding: 16px;
+                border-left: none;
+                border-right: none;
+            }
+
+            .log-box {
+                height: 42dvh;
+            }
         }
     </style>
 </head>
