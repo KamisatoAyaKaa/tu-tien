@@ -203,6 +203,32 @@
             margin-top: 12px;
         }
 
+        .char-setup label.form-label {
+            display: block;
+            margin: 10px 0 6px;
+            color: #888;
+            font-size: 0.85em;
+        }
+
+        .char-setup input,
+        .char-setup select {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #18181c;
+            color: var(--text);
+            font: inherit;
+        }
+
+        #player-banner {
+            margin: 8px 0 0;
+            color: #aaa;
+            font-size: 0.9em;
+            min-height: 1.2em;
+        }
+
         /* Tối ưu hiển thị mobile: vừa khung nhìn, không dư khoảng trống */
         @media (max-width: 768px) {
             #game-outer {
@@ -236,9 +262,31 @@
             <div class="header">
                 <h1 style="color: var(--gold); margin: 0;">TU TIÊN LỘ</h1>
                 <p>Bản: Bí Cảnh Ẩn Thế</p>
+                <p id="player-banner"></p>
             </div>
 
             <div id="setup-screen">
+                <div id="char-setup" class="char-setup"
+                    style="background:#25252b;padding:18px;border-radius:10px;margin-bottom:20px;text-align:left;border:1px solid #333;">
+                    <h3 class="highlight" style="margin:0 0 14px 0;text-align:center;">Khởi tạo đạo hữu</h3>
+                    <label class="form-label" for="pc-name">Tên hiển thị <span style="color:var(--red)">*</span></label>
+                    <input id="pc-name" type="text" maxlength="16" placeholder="Ví dụ: Tiêu Dao" autocomplete="nickname" />
+                    <label class="form-label" for="pc-gender">Giới tính</label>
+                    <select id="pc-gender">
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                        <option value="Ẩn danh">Không tiết lộ</option>
+                    </select>
+                    <label class="form-label" for="pc-dao-hieu">Đạo hiệu (tuỳ chọn)</label>
+                    <input id="pc-dao-hieu" type="text" maxlength="24" placeholder="Ví dụ: Nhất Niệm Thanh Phong" />
+                    <label class="form-label" for="pc-origin">Xuất thân</label>
+                    <select id="pc-origin">
+                        <option value="dan">Thôn dân (bình thường)</option>
+                        <option value="thu">Thư hương (+2 Ngộ tính khi xuất phát)</option>
+                        <option value="vo">Võ lâm hậu nhân (+15 thọ ban đầu)</option>
+                    </select>
+                </div>
+
                 <div id="trait-display"
                     style="background:#25252b; padding:20px; border-radius:10px; margin-bottom:20px; border:1px dashed var(--gold);">
                     <h3 id="init-lc" class="highlight">Linh Căn: ???</h3>
@@ -256,6 +304,10 @@
 
             <div id="play-screen" style="display:none;">
                 <div class="stats-grid">
+                    <div class="stat-item" style="grid-column: 1 / -1;">
+                        <span class="stat-label">Đạo hữu</span>
+                        <span id="pc-play-line" class="highlight">--</span>
+                    </div>
                     <div class="stat-item"><span class="stat-label">Cảnh Giới</span><span id="rank-txt"
                             class="highlight">--</span></div>
                     <div class="stat-item"><span class="stat-label">Linh Lực</span><span id="mana-txt">0</span> / <span
@@ -349,8 +401,80 @@
     faction: FACTIONS.NONE,          // Khởi đầu: Tản Tu (chưa nhập phe)
     factionProbation: 0,             // >0 nghĩa là đang “nhập môn” Chính Đạo, dễ bị phản bội
     pendingFactionChoice: false,
-    isDead: false
+    isDead: false,
+    pcName: "",
+    pcGender: "",
+    pcDaoHieu: "",
+    pcOrigin: "dan"
   };
+
+  const ORIGIN_LABELS = { dan: "Thôn dân", thu: "Thư hương", vo: "Võ lâm hậu nhân" };
+
+  function getPlayerDisplayTitle() {
+    const dao = (p.pcDaoHieu || "").trim();
+    const name = (p.pcName || "").trim() || "Vô danh";
+    if (dao) return `${dao} · ${name}`;
+    return name;
+  }
+
+  function updatePlayerBanner() {
+    const banner = document.getElementById("player-banner");
+    const playLine = document.getElementById("pc-play-line");
+    const setupEl = document.getElementById("setup-screen");
+    const setupVisible = setupEl && setupEl.style.display !== "none";
+
+    let name = (p.pcName || "").trim();
+    let gender = (p.pcGender || "").trim();
+    let dao = (p.pcDaoHieu || "").trim();
+    let originKey = p.pcOrigin || "dan";
+
+    if (setupVisible) {
+      name = (document.getElementById("pc-name").value || "").trim();
+      gender = (document.getElementById("pc-gender").value || "").trim();
+      dao = (document.getElementById("pc-dao-hieu").value || "").trim();
+      originKey = document.getElementById("pc-origin").value || "dan";
+    }
+
+    if (!name) {
+      banner.textContent = "Hãy nhập tên đạo hữu ở trên, rồi gieo quẻ và bắt đầu luân hồi.";
+      if (playLine) playLine.textContent = "--";
+      return;
+    }
+
+    const displayName = dao ? `${dao} · ${name}` : name;
+    const bits = [displayName];
+    if (gender) bits.push(gender);
+    if (ORIGIN_LABELS[originKey]) bits.push(ORIGIN_LABELS[originKey]);
+
+    const line = bits.join(" · ");
+    banner.textContent = line;
+    if (playLine) playLine.textContent = line;
+  }
+
+  function readCharacterFromForm() {
+    const nameRaw = (document.getElementById("pc-name").value || "").trim();
+    if (!nameRaw) {
+      alert("Hãy nhập tên đạo hữu (2–16 ký tự).");
+      return false;
+    }
+    if (nameRaw.length < 2 || nameRaw.length > 16) {
+      alert("Tên hiển thị cần từ 2 đến 16 ký tự.");
+      return false;
+    }
+
+    const daoRaw = (document.getElementById("pc-dao-hieu").value || "").trim();
+    if (daoRaw.length > 24) {
+      alert("Đạo hiệu quá dài (tối đa 24 ký tự).");
+      return false;
+    }
+
+    p.pcName = nameRaw;
+    p.pcGender = (document.getElementById("pc-gender").value || "").trim();
+    p.pcDaoHieu = daoRaw;
+    p.pcOrigin = document.getElementById("pc-origin").value || "dan";
+    updatePlayerBanner();
+    return true;
+  }
 
   function rollFate() {
     p.lc = LINH_CAN[Math.floor(Math.random() * LINH_CAN.length)];
@@ -362,6 +486,7 @@
     p.factionProbation = 0;
 
     updateInitUI();
+    updatePlayerBanner();
     document.getElementById("start-btn").style.display = "block";
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -374,6 +499,7 @@
     p.factionProbation = 0;
 
     updateInitUI();
+    updatePlayerBanner();
     window.scrollTo({ top: 0, behavior: "smooth" });
     document.getElementById("trait-display").style.border = "2px solid #ff00ff";
     document.getElementById("start-btn").style.display = "block";
@@ -387,6 +513,8 @@
   }
 
   function startGame() {
+    if (!readCharacterFromForm()) return;
+
     if (!p.lc?.name || !p.kv?.name) {
       alert("Hãy Gieo Quẻ trước đã!");
       return;
@@ -397,14 +525,19 @@
 
     // Tính toán chỉ số ban đầu
     p.maxAge = STAGES[0].age + (p.kv.ageBonus || 0);
+    if (p.pcOrigin === "vo") p.maxAge += 15;
     if (p.kv.wisdomBonus) p.wisdom += p.kv.wisdomBonus;
+    if (p.pcOrigin === "thu") p.wisdom += 2;
 
     document.getElementById("lc-txt").innerText = p.lc.name;
     document.getElementById("lc-txt").style.color = p.lc.color;
     document.getElementById("wisdom-txt").innerText = p.wisdom;
     document.getElementById("kv-txt").innerText = `${p.kv.name} | ${p.faction.name}`;
 
-    writeLog(`Hành trình bắt đầu. Ngươi là một ${p.faction.name} mang ${p.lc.name}...`);
+    updatePlayerBanner();
+
+    const title = getPlayerDisplayTitle();
+    writeLog(`Hành trình mở ra. <b>${title}</b> (${ORIGIN_LABELS[p.pcOrigin] || ""}), ${p.pcGender}, là một ${p.faction.name} mang ${p.lc.name}...`);
     updateUI();
   }
 
@@ -427,6 +560,7 @@
 
     rankTxt.style.color = p.faction.color;
     factionTxt.innerText = `${p.kv.name} | ${p.faction.name}`;
+    updatePlayerBanner();
 
     const btn = document.getElementById("break-btn");
     if (p.mana >= cur.mana) {
@@ -655,6 +789,14 @@
     pTag.innerHTML = `[${p.age.toFixed(0)} tuổi] ${msg}`;
     log.prepend(pTag);
   }
+
+  ["pc-name", "pc-gender", "pc-dao-hieu", "pc-origin"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", updatePlayerBanner);
+    if (el && el.tagName === "SELECT") el.addEventListener("change", updatePlayerBanner);
+  });
+
+  updatePlayerBanner();
 </script>
 </body>
 
