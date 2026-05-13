@@ -142,6 +142,11 @@
             background: #444;
         }
 
+        button:not(.btn-cheat):disabled {
+            cursor: not-allowed;
+            filter: grayscale(0.35);
+        }
+
         .btn-major {
             background: #d35400;
             grid-column: span 2;
@@ -343,11 +348,15 @@
                     </div>
                     <div class="stat-item"><span class="stat-label">Khí Vận</span><span id="kv-txt"
                             style="color:var(--purple)">--</span></div>
+                    <div class="stat-item" style="grid-column: 1 / -1;">
+                        <span class="stat-label">Lượt hành động (hồi 1 / 2 phút)</span>
+                        <span id="charge-summary-line" style="color:#aaa;font-size:0.9em;">--</span>
+                    </div>
                 </div>
                 <div id="log" class="log-box"></div>
                 <div class="action-grid">
-                    <button onclick="train()">Tu Luyện</button>
-                    <button onclick="explore()">Tìm Kỳ Ngộ</button>
+                    <button id="btn-train" type="button" onclick="train()">Tu Luyện</button>
+                    <button id="btn-explore" type="button" onclick="explore()">Tìm Kỳ Ngộ</button>
                     <button type="button" class="btn-save" onclick="saveGameToStorage(false)">💾 Lưu</button>
                     <button type="button" class="btn-delete-save" onclick="deleteSaveConfirm()">Xóa lưu</button>
                     <button id="break-btn" class="btn-major" onclick="handleBreakthrough()"></button>
@@ -447,6 +456,143 @@
     return 1 + p.stage * REALM_TRAIN_AGE_PER_STAGE + Math.max(0, p.level - 1) * REALM_TRAIN_AGE_PER_LEVEL;
   }
 
+  /** Lượt tu luyện / kỳ ngộ: hồi 1 lượt mỗi CHARGE_REFILL_MS (thời gian thực) */
+  const CHARGE_REFILL_MS = 2 * 60 * 1000;
+  const MAX_TRAIN_CHARGES = 20;
+  const MAX_EXPLORE_CHARGES = 20;
+
+  function refillTrainCharges() {
+    if (p.trainCharges >= MAX_TRAIN_CHARGES) return;
+    const now = Date.now();
+    let elapsed = now - p.trainRefillAnchor;
+    let gained = Math.floor(elapsed / CHARGE_REFILL_MS);
+    if (gained <= 0) return;
+    const room = MAX_TRAIN_CHARGES - p.trainCharges;
+    const add = Math.min(gained, room);
+    p.trainCharges += add;
+    p.trainRefillAnchor += add * CHARGE_REFILL_MS;
+    if (p.trainCharges >= MAX_TRAIN_CHARGES) {
+      p.trainCharges = MAX_TRAIN_CHARGES;
+      p.trainRefillAnchor = now;
+    }
+  }
+
+  function refillExploreCharges() {
+    if (p.exploreCharges >= MAX_EXPLORE_CHARGES) return;
+    const now = Date.now();
+    let elapsed = now - p.exploreRefillAnchor;
+    let gained = Math.floor(elapsed / CHARGE_REFILL_MS);
+    if (gained <= 0) return;
+    const room = MAX_EXPLORE_CHARGES - p.exploreCharges;
+    const add = Math.min(gained, room);
+    p.exploreCharges += add;
+    p.exploreRefillAnchor += add * CHARGE_REFILL_MS;
+    if (p.exploreCharges >= MAX_EXPLORE_CHARGES) {
+      p.exploreCharges = MAX_EXPLORE_CHARGES;
+      p.exploreRefillAnchor = now;
+    }
+  }
+
+  function refillActionCharges() {
+    refillTrainCharges();
+    refillExploreCharges();
+  }
+
+  function spendTrainCharge() {
+    refillTrainCharges();
+    if (p.trainCharges <= 0) return false;
+    const wasFull = p.trainCharges >= MAX_TRAIN_CHARGES;
+    p.trainCharges--;
+    if (wasFull && p.trainCharges < MAX_TRAIN_CHARGES) p.trainRefillAnchor = Date.now();
+    return true;
+  }
+
+  function spendExploreCharge() {
+    refillExploreCharges();
+    if (p.exploreCharges <= 0) return false;
+    const wasFull = p.exploreCharges >= MAX_EXPLORE_CHARGES;
+    p.exploreCharges--;
+    if (wasFull && p.exploreCharges < MAX_EXPLORE_CHARGES) p.exploreRefillAnchor = Date.now();
+    return true;
+  }
+
+  function initActionChargesFull() {
+    p.trainCharges = MAX_TRAIN_CHARGES;
+    p.exploreCharges = MAX_EXPLORE_CHARGES;
+    p.trainRefillAnchor = Date.now();
+    p.exploreRefillAnchor = Date.now();
+  }
+
+  function ensureActionChargesDefaults() {
+    if (typeof p.trainCharges !== "number" || p.trainCharges < 0) p.trainCharges = MAX_TRAIN_CHARGES;
+    if (typeof p.exploreCharges !== "number" || p.exploreCharges < 0) p.exploreCharges = MAX_EXPLORE_CHARGES;
+    if (typeof p.trainRefillAnchor !== "number") p.trainRefillAnchor = Date.now();
+    if (typeof p.exploreRefillAnchor !== "number") p.exploreRefillAnchor = Date.now();
+    p.trainCharges = Math.min(MAX_TRAIN_CHARGES, p.trainCharges);
+    p.exploreCharges = Math.min(MAX_EXPLORE_CHARGES, p.exploreCharges);
+  }
+
+  function msUntilNextTrainCharge() {
+    refillTrainCharges();
+    if (p.trainCharges >= MAX_TRAIN_CHARGES) return null;
+    return Math.max(0, p.trainRefillAnchor + CHARGE_REFILL_MS - Date.now());
+  }
+
+  function msUntilNextExploreCharge() {
+    refillExploreCharges();
+    if (p.exploreCharges >= MAX_EXPLORE_CHARGES) return null;
+    return Math.max(0, p.exploreRefillAnchor + CHARGE_REFILL_MS - Date.now());
+  }
+
+  function formatCountdownMs(ms) {
+    if (ms == null) return "";
+    const s = Math.ceil(ms / 1000);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${r.toString().padStart(2, "0")}`;
+  }
+
+  function updateChargeDisplay() {
+    refillActionCharges();
+    const trainBtn = document.getElementById("btn-train");
+    const exploreBtn = document.getElementById("btn-explore");
+    const line = document.getElementById("charge-summary-line");
+    if (!trainBtn || !exploreBtn) return;
+
+    const tNext = msUntilNextTrainCharge();
+    const eNext = msUntilNextExploreCharge();
+    const tHint = p.trainCharges >= MAX_TRAIN_CHARGES ? "đầy" : `tiếp: ${formatCountdownMs(tNext)}`;
+    const eHint = p.exploreCharges >= MAX_EXPLORE_CHARGES ? "đầy" : `tiếp: ${formatCountdownMs(eNext)}`;
+
+    trainBtn.disabled = p.trainCharges <= 0 || p.isDead;
+    exploreBtn.disabled = p.exploreCharges <= 0 || p.isDead;
+    trainBtn.style.opacity = trainBtn.disabled ? "0.45" : "1";
+    exploreBtn.style.opacity = exploreBtn.disabled ? "0.45" : "1";
+
+    trainBtn.textContent = `Tu Luyện (${p.trainCharges}/${MAX_TRAIN_CHARGES})`;
+    exploreBtn.textContent = `Tìm Kỳ Ngộ (${p.exploreCharges}/${MAX_EXPLORE_CHARGES})`;
+
+    if (line) {
+      line.textContent = `Tu: ${p.trainCharges}/${MAX_TRAIN_CHARGES} (${tHint}) · Kỳ ngộ: ${p.exploreCharges}/${MAX_EXPLORE_CHARGES} (${eHint})`;
+    }
+  }
+
+  let chargeTickTimer = null;
+  function stopChargeTick() {
+    if (chargeTickTimer) {
+      clearInterval(chargeTickTimer);
+      chargeTickTimer = null;
+    }
+  }
+
+  function startChargeTickIfPlaying() {
+    if (chargeTickTimer) clearInterval(chargeTickTimer);
+    chargeTickTimer = setInterval(() => {
+      if (document.getElementById("play-screen").style.display === "none") return;
+      updateChargeDisplay();
+    }, 1000);
+  }
+
   let p = {
     stage: 0,
     level: 1,
@@ -463,7 +609,11 @@
     pcName: "",
     pcGender: "",
     pcDaoHieu: "",
-    pcOrigin: "dan"
+    pcOrigin: "dan",
+    trainCharges: MAX_TRAIN_CHARGES,
+    exploreCharges: MAX_EXPLORE_CHARGES,
+    trainRefillAnchor: Date.now(),
+    exploreRefillAnchor: Date.now()
   };
 
   const ORIGIN_LABELS = { dan: "Thôn dân", thu: "Thư hương", vo: "Võ lâm hậu nhân" };
@@ -492,6 +642,7 @@
 
   function buildSavePayload() {
     const inGame = document.getElementById("play-screen").style.display !== "none";
+    if (inGame) refillActionCharges();
     if (!inGame) {
       p.pcName = (document.getElementById("pc-name").value || "").trim();
       p.pcGender = (document.getElementById("pc-gender").value || "").trim();
@@ -518,7 +669,11 @@
         pcName: p.pcName,
         pcGender: p.pcGender,
         pcDaoHieu: p.pcDaoHieu,
-        pcOrigin: p.pcOrigin
+        pcOrigin: p.pcOrigin,
+        trainCharges: p.trainCharges,
+        exploreCharges: p.exploreCharges,
+        trainRefillAnchor: p.trainRefillAnchor,
+        exploreRefillAnchor: p.exploreRefillAnchor
       },
       logHtml: inGame ? document.getElementById("log").innerHTML : "",
       form: {
@@ -548,6 +703,11 @@
     p.pcGender = sp.pcGender || "";
     p.pcDaoHieu = sp.pcDaoHieu || "";
     p.pcOrigin = sp.pcOrigin || "dan";
+    p.trainCharges = sp.trainCharges;
+    p.exploreCharges = sp.exploreCharges;
+    p.trainRefillAnchor = sp.trainRefillAnchor;
+    p.exploreRefillAnchor = sp.exploreRefillAnchor;
+    ensureActionChargesDefaults();
   }
 
   function syncFormFromPlayer() {
@@ -613,6 +773,7 @@
       }
       updateUI();
       writeLog("📜 <b>Đã tải lưu trữ.</b> Tiếp tục hành trình.", "highlight");
+      startChargeTickIfPlaying();
     } else {
       document.getElementById("setup-screen").style.display = "block";
       document.getElementById("play-screen").style.display = "none";
@@ -622,6 +783,7 @@
       const hasTraits = !!(p.lc?.name && p.kv?.name);
       document.getElementById("start-btn").style.display = hasTraits ? "block" : "none";
       if (p.pendingFactionChoice) p.pendingFactionChoice = false;
+      stopChargeTick();
     }
 
     refreshSaveHint();
@@ -780,6 +942,8 @@
     document.getElementById("setup-screen").style.display = "none";
     document.getElementById("play-screen").style.display = "block";
 
+    initActionChargesFull();
+
     // Tính toán chỉ số ban đầu
     p.maxAge = STAGES[0].age + (p.kv.ageBonus || 0);
     if (p.pcOrigin === "vo") p.maxAge += 15;
@@ -796,6 +960,7 @@
     const title = getPlayerDisplayTitle();
     writeLog(`Hành trình mở ra. <b>${title}</b> (${ORIGIN_LABELS[p.pcOrigin] || ""}), ${p.pcGender}, là một ${p.faction.name} mang ${p.lc.name}...`);
     updateUI();
+    startChargeTickIfPlaying();
     maybeAutoSave();
   }
 
@@ -840,10 +1005,17 @@
       writeLog("Đèn cạn dầu tắt... Trăm năm tu hành hóa thành cát bụi.", "danger");
       setTimeout(() => { if (confirm("THÂN TỬ ĐẠO TIÊU. Luân hồi chuyển kiếp?")) location.reload(); }, 500);
     }
+
+    updateChargeDisplay();
   }
 
   function train() {
     if (p.isDead) return;
+    if (!spendTrainCharge()) {
+      writeLog("Lượt <b>Tu Luyện</b> đã cạn. Mỗi <b>2 phút</b> (thời gian thực) hồi thêm 1 lượt.", "highlight");
+      updateChargeDisplay();
+      return;
+    }
     const cur = STAGES[p.stage];
     const realmDif = getRealmTrainDifficulty();
     const gainRealmDiv = 1 + p.stage * REALM_TRAIN_GAIN_DIV_STAGE;
@@ -879,6 +1051,12 @@
     if (p.isDead) return;
     if (p.pendingFactionChoice) {
       writeLog("Hãy chọn phe từ kì ngộ trước khi tiếp tục lịch lãm.", "highlight");
+      return;
+    }
+
+    if (!spendExploreCharge()) {
+      writeLog("Lượt <b>Tìm Kỳ Ngộ</b> đã cạn. Mỗi <b>2 phút</b> (thời gian thực) hồi thêm 1 lượt.", "highlight");
+      updateChargeDisplay();
       return;
     }
 
