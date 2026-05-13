@@ -229,6 +229,24 @@
             min-height: 1.2em;
         }
 
+        .btn-save {
+            background: #34495e !important;
+        }
+
+        .btn-delete-save {
+            background: #7f8c8d !important;
+        }
+
+        .btn-continue {
+            background: #8e44ad !important;
+        }
+
+        #save-hint {
+            color: #666;
+            font-size: 0.85em;
+            margin: 12px 0 0;
+        }
+
         /* Tối ưu hiển thị mobile: vừa khung nhìn, không dư khoảng trống */
         @media (max-width: 768px) {
             #game-outer {
@@ -298,6 +316,11 @@
                 <button id="start-btn" onclick="startGame()"
                     style="display:none; width:100%; background:var(--blue); margin-top:10px;">Bắt Đầu Luân Hồi</button>
 
+                <p id="save-hint"></p>
+                <button id="btn-continue" type="button" class="btn-continue" onclick="loadGameFromStorage()"
+                    style="display:none; width:100%; margin-top:10px;">Tiếp tục</button>
+                <button type="button" class="btn-save" onclick="saveGameToStorage(false)"
+                    style="width:100%; margin-top:10px;">💾 Lưu tiến trình (màn hình này)</button>
 
                 <button onclick="godMode()" class="btn-cheat">⚡ Nghịch Thiên ⚡</button>
             </div>
@@ -325,6 +348,8 @@
                 <div class="action-grid">
                     <button onclick="train()">Tu Luyện</button>
                     <button onclick="explore()">Tìm Kỳ Ngộ</button>
+                    <button type="button" class="btn-save" onclick="saveGameToStorage(false)">💾 Lưu</button>
+                    <button type="button" class="btn-delete-save" onclick="deleteSaveConfirm()">Xóa lưu</button>
                     <button id="break-btn" class="btn-major" onclick="handleBreakthrough()"></button>
                 </div>
             </div>
@@ -389,6 +414,39 @@
     { name: "Độ Kiếp", mana: 5000000000, age: 500000, speed: 10000000 }
   ];
 
+  /** Mỗi tầng tiểu cảnh (1→9): ngưỡng linh lực nhân thêm bao nhiêu lần */
+  const BREAK_MANA_PER_LEVEL_MUL = 1.14;
+  /** Đột phá đại cảnh (tầng 10): tối thiểu = max(nền × hệ số, tỉ lệ nền cảnh sau) */
+  const BREAK_MAJOR_CUR_MUL = 2.35;
+  const BREAK_MAJOR_NEXT_FRAC = 0.16;
+  /** Phi thăng (cảnh cuối, tầng 10): nhân nền linh lực cảnh hiện tại */
+  const BREAK_ASCENSION_MUL = 4.2;
+
+  /** Tu luyện: tốn thêm năm theo đại cảnh + theo tầng trong cảnh */
+  const REALM_TRAIN_AGE_PER_STAGE = 0.26;
+  const REALM_TRAIN_AGE_PER_LEVEL = 0.045;
+  /** Linh lực mỗi lần tu hơi giảm khi cảnh giới cao (cân bằng với ngưỡng đột phá tăng) */
+  const REALM_TRAIN_GAIN_DIV_STAGE = 0.11;
+
+  function getBreakthroughManaTarget() {
+    const cur = STAGES[p.stage];
+    if (p.level < 10) {
+      return Math.max(1, Math.floor(cur.mana * Math.pow(BREAK_MANA_PER_LEVEL_MUL, p.level - 1)));
+    }
+    if (p.stage >= STAGES.length - 1) {
+      return Math.max(1, Math.floor(cur.mana * BREAK_ASCENSION_MUL));
+    }
+    const next = STAGES[p.stage + 1];
+    return Math.max(
+      Math.floor(cur.mana * BREAK_MAJOR_CUR_MUL),
+      Math.floor(next.mana * BREAK_MAJOR_NEXT_FRAC)
+    );
+  }
+
+  function getRealmTrainDifficulty() {
+    return 1 + p.stage * REALM_TRAIN_AGE_PER_STAGE + Math.max(0, p.level - 1) * REALM_TRAIN_AGE_PER_LEVEL;
+  }
+
   let p = {
     stage: 0,
     level: 1,
@@ -409,6 +467,205 @@
   };
 
   const ORIGIN_LABELS = { dan: "Thôn dân", thu: "Thư hương", vo: "Võ lâm hậu nhân" };
+
+  const SAVE_KEY = "tu_tien_lo_save_v1";
+
+  function factionToKey(f) {
+    if (f === FACTIONS.CHINH) return "CHINH";
+    if (f === FACTIONS.MA) return "MA";
+    return "NONE";
+  }
+
+  function keyToFaction(key) {
+    if (key === "CHINH") return FACTIONS.CHINH;
+    if (key === "MA") return FACTIONS.MA;
+    return FACTIONS.NONE;
+  }
+
+  function resolveLcByName(name) {
+    return LINH_CAN.find((l) => l.name === name) || {};
+  }
+
+  function resolveKvByName(name) {
+    return KHI_VAN.find((k) => k.name === name) || {};
+  }
+
+  function buildSavePayload() {
+    const inGame = document.getElementById("play-screen").style.display !== "none";
+    if (!inGame) {
+      p.pcName = (document.getElementById("pc-name").value || "").trim();
+      p.pcGender = (document.getElementById("pc-gender").value || "").trim();
+      p.pcDaoHieu = (document.getElementById("pc-dao-hieu").value || "").trim();
+      p.pcOrigin = document.getElementById("pc-origin").value || "dan";
+    }
+    const payload = {
+      v: 1,
+      savedAt: Date.now(),
+      mode: inGame ? "play" : "setup",
+      p: {
+        stage: p.stage,
+        level: p.level,
+        mana: p.mana,
+        age: p.age,
+        maxAge: p.maxAge,
+        wisdom: p.wisdom,
+        lcName: p.lc?.name || "",
+        kvName: p.kv?.name || "",
+        factionKey: factionToKey(p.faction),
+        factionProbation: p.factionProbation,
+        pendingFactionChoice: p.pendingFactionChoice,
+        isDead: p.isDead,
+        pcName: p.pcName,
+        pcGender: p.pcGender,
+        pcDaoHieu: p.pcDaoHieu,
+        pcOrigin: p.pcOrigin
+      },
+      logHtml: inGame ? document.getElementById("log").innerHTML : "",
+      form: {
+        pcName: document.getElementById("pc-name").value,
+        pcGender: document.getElementById("pc-gender").value,
+        pcDaoHieu: document.getElementById("pc-dao-hieu").value,
+        pcOrigin: document.getElementById("pc-origin").value
+      }
+    };
+    return payload;
+  }
+
+  function applyPlayerFromSave(sp) {
+    p.stage = sp.stage ?? 0;
+    p.level = sp.level ?? 1;
+    p.mana = sp.mana ?? 0;
+    p.age = sp.age ?? 18;
+    p.maxAge = sp.maxAge ?? 0;
+    p.wisdom = sp.wisdom ?? 0;
+    p.lc = resolveLcByName(sp.lcName) || {};
+    p.kv = resolveKvByName(sp.kvName) || {};
+    p.faction = keyToFaction(sp.factionKey);
+    p.factionProbation = sp.factionProbation ?? 0;
+    p.pendingFactionChoice = !!sp.pendingFactionChoice;
+    p.isDead = !!sp.isDead;
+    p.pcName = sp.pcName || "";
+    p.pcGender = sp.pcGender || "";
+    p.pcDaoHieu = sp.pcDaoHieu || "";
+    p.pcOrigin = sp.pcOrigin || "dan";
+  }
+
+  function syncFormFromPlayer() {
+    document.getElementById("pc-name").value = p.pcName || "";
+    document.getElementById("pc-gender").value = p.pcGender || "Nam";
+    document.getElementById("pc-dao-hieu").value = p.pcDaoHieu || "";
+    document.getElementById("pc-origin").value = p.pcOrigin || "dan";
+  }
+
+  function saveGameToStorage(silent) {
+    try {
+      const payload = buildSavePayload();
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      refreshSaveHint();
+      if (!silent) alert("Đã lưu tiến trình vào trình duyệt (localStorage).");
+    } catch (e) {
+      if (!silent) alert("Không lưu được: " + (e.message || e));
+    }
+  }
+
+  function loadGameFromStorage() {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) {
+      alert("Chưa có dữ liệu lưu.");
+      return;
+    }
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      alert("File lưu bị hỏng.");
+      return;
+    }
+    if (!data || data.v !== 1 || !data.p) {
+      alert("Bản lưu không tương thích.");
+      return;
+    }
+
+    applyPlayerFromSave(data.p);
+
+    if (data.form) {
+      document.getElementById("pc-name").value = data.form.pcName || p.pcName || "";
+      document.getElementById("pc-gender").value = data.form.pcGender || p.pcGender || "Nam";
+      document.getElementById("pc-dao-hieu").value = data.form.pcDaoHieu ?? p.pcDaoHieu ?? "";
+      document.getElementById("pc-origin").value = data.form.pcOrigin || p.pcOrigin || "dan";
+    } else {
+      syncFormFromPlayer();
+    }
+
+    hideFactionChoiceModal();
+
+    if (data.mode === "play") {
+      document.getElementById("setup-screen").style.display = "none";
+      document.getElementById("play-screen").style.display = "block";
+      document.getElementById("log").innerHTML = data.logHtml || "";
+      document.getElementById("lc-txt").innerText = p.lc.name || "--";
+      document.getElementById("lc-txt").style.color = p.lc.color || "#cdcdcd";
+      document.getElementById("wisdom-txt").innerText = p.wisdom;
+      document.getElementById("kv-txt").innerText = `${p.kv.name || "?"} | ${p.faction.name}`;
+      updatePlayerBanner();
+      if (p.pendingFactionChoice) {
+        document.getElementById("faction-modal").classList.add("show");
+      }
+      updateUI();
+      writeLog("📜 <b>Đã tải lưu trữ.</b> Tiếp tục hành trình.", "highlight");
+    } else {
+      document.getElementById("setup-screen").style.display = "block";
+      document.getElementById("play-screen").style.display = "none";
+      document.getElementById("log").innerHTML = "";
+      updateInitUI();
+      updatePlayerBanner();
+      const hasTraits = !!(p.lc?.name && p.kv?.name);
+      document.getElementById("start-btn").style.display = hasTraits ? "block" : "none";
+      if (p.pendingFactionChoice) p.pendingFactionChoice = false;
+    }
+
+    refreshSaveHint();
+  }
+
+  function deleteSaveConfirm() {
+    if (!localStorage.getItem(SAVE_KEY)) {
+      alert("Không có lưu trữ để xóa.");
+      return;
+    }
+    if (!confirm("Xóa hẳn lưu trữ trên trình duyệt? Không thể hoàn tác.")) return;
+    localStorage.removeItem(SAVE_KEY);
+    refreshSaveHint();
+    alert("Đã xóa lưu trữ.");
+  }
+
+  function refreshSaveHint() {
+    const hint = document.getElementById("save-hint");
+    const btn = document.getElementById("btn-continue");
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!hint || !btn) return;
+    if (!raw) {
+      hint.textContent = "";
+      btn.style.display = "none";
+      return;
+    }
+    try {
+      const d = JSON.parse(raw);
+      const t = d.savedAt ? new Date(d.savedAt).toLocaleString("vi-VN") : "";
+      const modeLabel = d.mode === "play" ? "đang chơi" : "màn khởi tạo";
+      hint.textContent = `Có lưu trữ (${modeLabel})${t ? " · " + t : ""}`;
+      btn.style.display = "block";
+      const name = (d.p && d.p.pcName) || (d.form && d.form.pcName) || "";
+      btn.textContent = name ? `Tiếp tục — ${name}` : "Tiếp tục";
+    } catch {
+      hint.textContent = "Có dữ liệu lưu nhưng không đọc được.";
+      btn.style.display = "block";
+    }
+  }
+
+  function maybeAutoSave() {
+    if (document.getElementById("play-screen").style.display === "none") return;
+    saveGameToStorage(true);
+  }
 
   function getPlayerDisplayTitle() {
     const dao = (p.pcDaoHieu || "").trim();
@@ -539,6 +796,7 @@
     const title = getPlayerDisplayTitle();
     writeLog(`Hành trình mở ra. <b>${title}</b> (${ORIGIN_LABELS[p.pcOrigin] || ""}), ${p.pcGender}, là một ${p.faction.name} mang ${p.lc.name}...`);
     updateUI();
+    maybeAutoSave();
   }
 
   function updateUI() {
@@ -550,8 +808,9 @@
     }
 
     document.getElementById("rank-txt").innerText = `${cur.name} Tầng ${p.level}`;
+    const manaTarget = getBreakthroughManaTarget();
     document.getElementById("mana-txt").innerText = Math.floor(p.mana).toLocaleString();
-    document.getElementById("max-mana-txt").innerText = cur.mana.toLocaleString();
+    document.getElementById("max-mana-txt").innerText = manaTarget.toLocaleString();
     document.getElementById("age-txt").innerText = p.age.toFixed(1);
     document.getElementById("max-age-txt").innerText = p.maxAge;
 
@@ -563,7 +822,7 @@
     updatePlayerBanner();
 
     const btn = document.getElementById("break-btn");
-    if (p.mana >= cur.mana) {
+    if (p.mana >= manaTarget) {
       btn.style.display = "block";
       if (p.stage === STAGES.length - 1 && p.level === 10) {
         btn.innerText = "✨ PHI THĂNG TIÊN GIỚI ✨";
@@ -586,16 +845,18 @@
   function train() {
     if (p.isDead) return;
     const cur = STAGES[p.stage];
+    const realmDif = getRealmTrainDifficulty();
+    const gainRealmDiv = 1 + p.stage * REALM_TRAIN_GAIN_DIV_STAGE;
 
     let baseAgeCost = 0.5;
     // Khí vận chi tử tu luyện nhanh hơn 20%
     if (p.kv.name === "Khí vận chi tử") baseAgeCost *= 0.8;
 
-    let actualAgeCost = parseFloat((baseAgeCost / (p.wisdom / 50)).toFixed(2));
-    actualAgeCost = Math.max(0.1, Math.min(2.0, actualAgeCost));
+    let actualAgeCost = parseFloat(((baseAgeCost * realmDif) / (p.wisdom / 50)).toFixed(2));
+    actualAgeCost = Math.max(0.1, Math.min(12, actualAgeCost));
 
     let gain =
-      (Math.random() * 5 + 5) *
+      ((Math.random() * 5 + 5) / gainRealmDiv) *
       p.lc.multi *
       cur.speed *
       (p.kv.multiBonus || 1) *
@@ -611,6 +872,7 @@
     p.mana += gain;
     p.age += actualAgeCost;
     updateUI();
+    maybeAutoSave();
   }
 
   function explore() {
@@ -642,6 +904,7 @@
     }
 
     updateUI();
+    maybeAutoSave();
   }
 
   function handleFactionEvents(opts = {}) {
@@ -727,6 +990,7 @@
     p.pendingFactionChoice = false;
     hideFactionChoiceModal();
     updateUI();
+    maybeAutoSave();
   }
 
   function handleNPC(curStageMana, lcScale) {
@@ -760,6 +1024,12 @@
 
   function handleBreakthrough() {
     if (p.isDead) return;
+    const manaTarget = getBreakthroughManaTarget();
+    if (p.mana < manaTarget) {
+      writeLog("Linh lực chưa đủ để đột phá!", "danger");
+      updateUI();
+      return;
+    }
     const isMajor = (p.level === 10);
     let chance = (isMajor ? 0.3 : 0.8) + (p.kv.breakBonus || 0) + (p.wisdom / 1000) + (p.faction.breakMod || 0);
 
@@ -780,6 +1050,7 @@
       writeLog("THẤT BẠI!", "danger");
     }
     updateUI();
+    maybeAutoSave();
   }
 
   function writeLog(msg, className = "") {
@@ -797,6 +1068,7 @@
   });
 
   updatePlayerBanner();
+  refreshSaveHint();
 </script>
 </body>
 
