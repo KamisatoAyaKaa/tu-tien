@@ -1,0 +1,267 @@
+:root {
+    --bg: #0d0d0d;
+    --panel: #1a1a1d;
+    --text: #cdcdcd;
+    --gold: #f1c40f;
+    --purple: #9b59b6;
+    --red: #e74c3c;
+    --green: #2ecc71;
+    --blue: #3498db;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', serif;
+    margin: 0;
+}
+
+#game-outer {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+#game-container {
+    width: 100%;
+    max-width: 700px;
+    background: var(--panel);
+    padding: 30px;
+    border-radius: 20px;
+    border: 1px solid #333;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+    position: relative;
+}
+
+.header {
+    text-align: center;
+    border-bottom: 2px solid #333;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+}
+
+#setup-screen {
+    position: relative;
+    min-height: 155dvh;
+    text-align: center;
+    padding-bottom: 24px;
+}
+
+.scroll-hint {
+    color: #444;
+    margin-top: 100px;
+    font-style: italic;
+}
+
+.btn-cheat {
+    position: absolute;
+    right: 10px;
+    bottom: 20px;
+    background: rgba(142, 68, 173, 0.2);
+    color: #555;
+    border: 1px solid #333;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.5s;
+    font-size: 0.8em;
+    text-decoration: none;
+}
+
+.btn-cheat:hover {
+    background: linear-gradient(45deg, #8e44ad, #c0392b);
+    color: #fff;
+    border-color: var(--gold);
+    box-shadow: 0 0 20px var(--gold);
+    transform: scale(1.1);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.stat-item {
+    background: #25252b;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid var(--gold);
+}
+
+.stat-label {
+    font-size: 0.8em;
+    color: #888;
+    display: block;
+}
+
+.log-box {
+    height: 350px;
+    overflow-y: auto;
+    background: #000;
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #333;
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+.action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+button:not(.btn-cheat) {
+    background: #2d3436;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+button:not(.btn-cheat):hover {
+    background: #444;
+}
+
+button:not(.btn-cheat):disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.35);
+}
+
+.btn-major {
+    background: #d35400;
+    grid-column: span 2;
+    display: none;
+    margin-top: 10px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.88; transform: scale(1.01); }
+}
+
+.highlight {
+    color: var(--gold);
+}
+
+.wisdom {
+    color: var(--blue);
+}
+
+.success {
+    color: var(--green);
+}
+
+.danger {
+    color: var(--red);
+}
+
+.godly {
+    color: #ff00ff;
+    text-shadow: 0 0 5px #ff00ff;
+    font-weight: bold;
+}
+
+.faction-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.faction-modal.show {
+    display: flex;
+}
+
+.faction-modal-content {
+    width: min(520px, 92vw);
+    background: #1f1f24;
+    border: 1px solid #444;
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+}
+
+.faction-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.char-setup label.form-label {
+    display: block;
+    margin: 10px 0 6px;
+    color: #888;
+    font-size: 0.85em;
+}
+
+.char-setup input,
+.char-setup select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background: #18181c;
+    color: var(--text);
+    font: inherit;
+}
+
+#player-banner {
+    margin: 8px 0 0;
+    color: #aaa;
+    font-size: 0.9em;
+    min-height: 1.2em;
+}
+
+.btn-save {
+    background: #34495e !important;
+}
+
+.btn-delete-save {
+    background: #7f8c8d !important;
+}
+
+.btn-continue {
+    background: #8e44ad !important;
+}
+
+#save-hint {
+    color: #666;
+    font-size: 0.85em;
+    margin: 12px 0 0;
+}
+
+@media (max-width: 768px) {
+    #game-outer {
+        padding: 0;
+        min-height: 100dvh;
+    }
+
+    #game-container {
+        min-height: 100dvh;
+        border-radius: 0;
+        padding: 16px;
+        border-left: none;
+        border-right: none;
+    }
+
+    #setup-screen {
+        min-height: 165dvh;
+    }
+
+    .log-box {
+        height: 42dvh;
+    }
+}
