@@ -389,21 +389,50 @@
 
   const LINH_CAN = [
     { name: "Phế linh căn", multi: 0.8, color: "#7f8c8d" },
-    { name: "Tam linh căn", multi: 2.0, color: "#3498db" },
-    { name: "Song linh căn", multi: 5.0, color: "#2ecc71" },
-    { name: "Đơn linh căn", multi: 12.0, color: "#f1c40f" },
-    { name: "Thiên linh căn", multi: 30.0, color: "#e67e22" }
+    { name: "Tam linh căn", multi: 1.0, color: "#3498db" },
+    { name: "Song linh căn", multi: 1.5, color: "#2ecc71" },
+    { name: "Đơn linh căn", multi: 2.5, color: "#f1c40f" },
+    { name: "Thiên linh căn", multi: 5.0, color: "#e67e22" }
   ];
 
   const KHI_VAN = [
-    { name: "Thiên mệnh khí vận", breakBonus: 0.2, ageBonus: 10 },
-    { name: "Long khí", wisdomBonus: 30 },
-    { name: "Sát khí", multiBonus: 1.8 },
-    { name: "Đào hoa khí", luckyBonus: 0.3 },
-    { name: "Ma vận", multiBonus: 2.5, breakBonus: -0.1 },
-    { name: "Phật vận", ageBonus: 10, wisdomBonus: 20 },
-    { name: "Khí vận chi tử", breakBonus: 0.5, ageBonus: 20, luckyBonus: 0.6 }
+    {
+      name: "Bình Phàm",
+      breakMinorMod: 0,
+      breakMajorMod: 0,
+      exploreGoodBonus: 0
+    },
+    {
+      name: "Cực Hung",
+      breakMinorMod: -0.1,
+      breakMajorMod: -0.2,
+      exploreGoodBonus: 0
+    },
+    {
+      name: "Thiên Kiêu",
+      breakMinorMod: 0.1,
+      breakMajorMod: 0.05,
+      exploreGoodBonus: 0
+    },
+    {
+      name: "Khí vận chi tử",
+      breakMinorMod: 0.2,
+      breakMajorMod: 0.2,
+      exploreGoodBonus: 0.2
+    }
   ];
+
+  /** Cộng dồn vào tỉ lệ đột phá (tiểu cảnh = level 1–9, đại cảnh = tầng 10 / phi thăng) */
+  function getKvBreakChanceDelta(isMajor) {
+    const kv = p.kv || {};
+    if (isMajor) return kv.breakMajorMod ?? 0;
+    return kv.breakMinorMod ?? 0;
+  }
+
+  /** Cộng vào xác suất gặp NPC “tốt” khi lịch lãm (kỳ ngộ tốt) */
+  function getKvExploreGoodBonus() {
+    return (p.kv && p.kv.exploreGoodBonus) || 0;
+  }
 
   const FACTIONS = {
     NONE: { name: "Tản Tu", breakMod: 0, trainMod: 1.0, npcLuck: 0, color: "#cdcdcd" },
@@ -637,7 +666,10 @@
   }
 
   function resolveKvByName(name) {
-    return KHI_VAN.find((k) => k.name === name) || {};
+    const found = KHI_VAN.find((k) => k.name === name);
+    if (found) return found;
+    if (name) return KHI_VAN.find((k) => k.name === "Bình Phàm") || KHI_VAN[0];
+    return {};
   }
 
   function buildSavePayload() {
@@ -945,9 +977,8 @@
     initActionChargesFull();
 
     // Tính toán chỉ số ban đầu
-    p.maxAge = STAGES[0].age + (p.kv.ageBonus || 0);
+    p.maxAge = STAGES[0].age;
     if (p.pcOrigin === "vo") p.maxAge += 15;
-    if (p.kv.wisdomBonus) p.wisdom += p.kv.wisdomBonus;
     if (p.pcOrigin === "thu") p.wisdom += 2;
 
     document.getElementById("lc-txt").innerText = p.lc.name;
@@ -1021,8 +1052,6 @@
     const gainRealmDiv = 1 + p.stage * REALM_TRAIN_GAIN_DIV_STAGE;
 
     let baseAgeCost = 0.5;
-    // Khí vận chi tử tu luyện nhanh hơn 20%
-    if (p.kv.name === "Khí vận chi tử") baseAgeCost *= 0.8;
 
     let actualAgeCost = parseFloat(((baseAgeCost * realmDif) / (p.wisdom / 50)).toFixed(2));
     actualAgeCost = Math.max(0.1, Math.min(12, actualAgeCost));
@@ -1031,7 +1060,6 @@
       ((Math.random() * 5 + 5) / gainRealmDiv) *
       p.lc.multi *
       cur.speed *
-      (p.kv.multiBonus || 1) *
       p.faction.trainMod;
 
     if (Math.random() < (p.wisdom / 800)) {
@@ -1062,7 +1090,6 @@
 
     let percentLost = (Math.random() * (0.05 - 0.01) + 0.01);
     let ageLost = p.maxAge * percentLost;
-    if (p.kv.name === "Khí vận chi tử") ageLost *= 0.5;
     p.age += ageLost;
 
     let npcRoll = Math.random();
@@ -1172,7 +1199,8 @@
   }
 
   function handleNPC(curStageMana, lcScale) {
-    let goodChance = 0.5 + (p.faction.npcLuck || 0);
+    let goodChance = 0.5 + (p.faction.npcLuck || 0) + getKvExploreGoodBonus();
+    goodChance = Math.min(0.95, Math.max(0.05, goodChance));
     const isGood = Math.random() < goodChance;
 
     if (isGood) {
@@ -1209,13 +1237,18 @@
       return;
     }
     const isMajor = (p.level === 10);
-    let chance = (isMajor ? 0.3 : 0.8) + (p.kv.breakBonus || 0) + (p.wisdom / 1000) + (p.faction.breakMod || 0);
+    let chance =
+      (isMajor ? 0.3 : 0.8) +
+      (p.wisdom / 1000) +
+      (p.faction.breakMod || 0) +
+      getKvBreakChanceDelta(isMajor);
+    chance = Math.min(0.98, Math.max(0.02, chance));
 
     if (Math.random() < chance) {
       if (isMajor) {
         p.stage++;
         p.level = 1;
-        p.maxAge = STAGES[p.stage].age + (p.kv.ageBonus || 0);
+        p.maxAge = STAGES[p.stage].age;
         writeLog(`⭐ ĐỘT PHÁ: ${STAGES[p.stage].name}!`, "godly");
       } else {
         p.level++;
