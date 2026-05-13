@@ -1,4 +1,9 @@
-import { p } from "./state.js";
+import { 
+  p,
+  rollCount, 
+  MAX_ROLLS, 
+  incrementRollCount 
+} from "./state.js";
 import {
   LINH_CAN,
   KHI_VAN,
@@ -33,15 +38,22 @@ import { readCharacterFromForm } from "./character.js";
 import { maybeAutoSave } from "./save.js";
 
 export function rollFate() {
-  p.lc = LINH_CAN[Math.floor(Math.random() * LINH_CAN.length)];
-  p.kv = KHI_VAN[Math.floor(Math.random() * KHI_VAN.length)];
+  // 1. Kiểm tra giới hạn
+  if (rollCount >= MAX_ROLLS) {
+      alert("Thiên cơ đã tận! Ngươi không thể gieo quẻ thêm nữa.");
+      return;
+  }
+
+  // 2. Logic gieo quẻ ngẫu nhiên
+  p.lc = LINH_CAN[Math.floor(Math.random() * (LINH_CAN.length - 1))];
+  p.kv = KHI_VAN[Math.floor(Math.random() * (KHI_VAN.length - 1))]; 
   p.wisdom = Math.floor(Math.random() * 60) + 20;
-  p.faction = FACTIONS.NONE;
-  p.factionProbation = 0;
+  
+  // 3. Tăng biến đếm và cập nhật UI
+  incrementRollCount();
   updateInitUI();
-  updatePlayerBanner();
-  document.getElementById("start-btn").style.display = "block";
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  
+  writeLog(`Gieo quẻ lần thứ ${rollCount}. (Còn lại ${MAX_ROLLS - rollCount} lần)`);
 }
 
 export function godMode() {
