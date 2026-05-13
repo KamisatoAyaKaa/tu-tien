@@ -1,4 +1,4 @@
-import { p } from "./state.js";
+import { p, rollCount, MAX_ROLLS } from "./state.js";
 import { STAGES, RANDOM_QUOTES, ORIGIN_LABELS } from "./data.js";
 import { getBreakthroughManaTarget } from "./mechanics.js";
 import { updateChargeDisplay } from "./charges.js";
@@ -57,6 +57,20 @@ export function updateInitUI() {
   document.getElementById("init-lc").style.color = p.lc?.color ?? "#cdcdcd";
   document.getElementById("init-wisdom").innerText = "Ngộ Tính: " + (p.wisdom ?? "???");
   document.getElementById("init-kv").innerText = "Khí Vận: " + (p.kv?.name ?? "???");
+
+  // Tìm nút gieo quẻ bằng querySelector dựa trên hàm onclick
+  const rollBtn = document.querySelector("button[onclick='rollFate()']");
+  if (rollBtn) {
+    const remains = MAX_ROLLS - rollCount;
+    rollBtn.innerText = `Gieo Quẻ (Còn ${remains} lần)`;
+    
+    // Nếu hết lượt thì làm mờ nút và đổi cursor
+    if (remains <= 0) {
+      rollBtn.style.opacity = "0.6";
+      rollBtn.style.cursor = "not-allowed";
+      rollBtn.innerText = "Thiên Cơ Đã Tận";
+    }
+  }
 }
 
 export function updateUI() {
