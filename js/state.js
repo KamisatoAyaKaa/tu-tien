@@ -30,3 +30,11 @@ export function createInitialP() {
 }
 
 export let p = createInitialP();
+
+export let rollCount = 0;
+export const MAX_ROLLS = 5;
+
+// Hàm để tăng số lần roll (vì biến export let không thể gán trực tiếp từ file khác)
+export function incrementRollCount() {
+    rollCount++;
+}
