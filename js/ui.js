@@ -61,9 +61,8 @@ export function updateInitUI() {
   document.getElementById("init-wisdom").innerText = "Ngộ Tính: " + (p.wisdom ?? "???");
   document.getElementById("init-kv").innerText = "Khí Vận: " + (p.kv?.name ?? "???");
 
-  // VÁ LỖI NÚT GIEO QUẺ: Hỗ trợ tìm qua ID hoặc thuộc tính
+  // Xử lý nút Gieo Quẻ
   const rollBtn = document.getElementById("btn-roll-fate") || document.querySelector("button[onclick='rollFate()']");
-  
   if (rollBtn) {
     const remains = MAX_ROLLS - rollCount;
     rollBtn.innerText = `Gieo Quẻ (Còn ${remains} lần)`;
@@ -72,8 +71,14 @@ export function updateInitUI() {
       rollBtn.style.opacity = "0.6";
       rollBtn.style.cursor = "not-allowed";
       rollBtn.innerText = "Thiên Cơ Đã Tận";
-      rollBtn.disabled = true; // Khóa hẳn nút để tránh spam click
+      rollBtn.disabled = true;
     }
+  }
+
+  // SỬA LỖI: Hiển thị nút Bắt Đầu sau khi đã có thông số (đã gieo quẻ ít nhất 1 lần)
+  const startBtn = document.getElementById("start-btn");
+  if (startBtn && p.lc && p.lc.name) { 
+    startBtn.style.display = "block"; // Hiển thị lại nút Bắt Đầu Luân Hồi
   }
 }
 
