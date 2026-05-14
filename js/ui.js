@@ -5,6 +5,7 @@ import { updateChargeDisplay } from "./charges.js";
 
 export function writeLog(msg, className = "") {
   const log = document.getElementById("log");
+  if (!log) return; // An toàn: Tránh lỗi nếu UI chưa load kịp
   const pTag = document.createElement("p");
   pTag.className = className;
   pTag.innerHTML = `[${p.age.toFixed(0)} tuổi] ${msg}`;
@@ -22,6 +23,8 @@ export function updatePlayerBanner() {
   const banner = document.getElementById("player-banner");
   const playLine = document.getElementById("pc-play-line");
   const setupEl = document.getElementById("setup-screen");
+  
+  if (!banner) return; // An toàn: Tránh lỗi DOM
   const setupVisible = setupEl && setupEl.style.display !== "none";
 
   let name = (p.pcName || "").trim();
@@ -30,10 +33,10 @@ export function updatePlayerBanner() {
   let originKey = p.pcOrigin || "dan";
 
   if (setupVisible) {
-    name = (document.getElementById("pc-name").value || "").trim();
-    gender = (document.getElementById("pc-gender").value || "").trim();
-    dao = (document.getElementById("pc-dao-hieu").value || "").trim();
-    originKey = document.getElementById("pc-origin").value || "dan";
+    name = (document.getElementById("pc-name")?.value || "").trim();
+    gender = (document.getElementById("pc-gender")?.value || "").trim();
+    dao = (document.getElementById("pc-dao-hieu")?.value || "").trim();
+    originKey = document.getElementById("pc-origin")?.value || "dan";
   }
 
   if (!name) {
@@ -58,22 +61,26 @@ export function updateInitUI() {
   document.getElementById("init-wisdom").innerText = "Ngộ Tính: " + (p.wisdom ?? "???");
   document.getElementById("init-kv").innerText = "Khí Vận: " + (p.kv?.name ?? "???");
 
-  // Tìm nút gieo quẻ bằng querySelector dựa trên hàm onclick
-  const rollBtn = document.querySelector("button[onclick='rollFate()']");
+  // VÁ LỖI NÚT GIEO QUẺ: Hỗ trợ tìm qua ID hoặc thuộc tính
+  const rollBtn = document.getElementById("btn-roll-fate") || document.querySelector("button[onclick='rollFate()']");
+  
   if (rollBtn) {
     const remains = MAX_ROLLS - rollCount;
     rollBtn.innerText = `Gieo Quẻ (Còn ${remains} lần)`;
     
-    // Nếu hết lượt thì làm mờ nút và đổi cursor
     if (remains <= 0) {
       rollBtn.style.opacity = "0.6";
       rollBtn.style.cursor = "not-allowed";
       rollBtn.innerText = "Thiên Cơ Đã Tận";
+      rollBtn.disabled = true; // Khóa hẳn nút để tránh spam click
     }
   }
 }
 
 export function updateUI() {
+  // Tránh update UI thừa thãi nếu đã quy tiên
+  if (p.isDead) return;
+
   const cur = STAGES[p.stage];
 
   if (Math.random() < 0.2) {
@@ -91,22 +98,27 @@ export function updateUI() {
   const rankTxt = document.getElementById("rank-txt");
   const factionTxt = document.getElementById("kv-txt");
 
-  rankTxt.style.color = p.faction.color;
-  factionTxt.innerText = `${p.kv.name} | ${p.faction.name}`;
+  // SỬA LỖI MẤT NÚT ĐỘT PHÁ Ở ĐÂY: 
+  // Dùng Optional Chaining (?.) để code không bị crash khi p.faction chưa tồn tại
+  rankTxt.style.color = p.faction?.color || "#cdcdcd";
+  factionTxt.innerText = `${p.kv?.name || "???"} | ${p.faction?.name || "Tản Tu"}`;
+  
   updatePlayerBanner();
 
   const btn = document.getElementById("break-btn");
-  if (p.mana >= manaTarget) {
-    btn.style.display = "block";
-    if (p.stage === STAGES.length - 1 && p.level === 10) {
-      btn.innerText = "✨ PHI THĂNG TIÊN GIỚI ✨";
-    } else if (p.level === 10) {
-      btn.innerText = `⭐ ĐỘT PHÁ ${STAGES[p.stage + 1].name} ⭐`;
+  if (btn) {
+    if (p.mana >= manaTarget) {
+      btn.style.display = "block";
+      if (p.stage === STAGES.length - 1 && p.level === 10) {
+        btn.innerText = "✨ PHI THĂNG TIÊN GIỚI ✨";
+      } else if (p.level === 10) {
+        btn.innerText = `⭐ ĐỘT PHÁ ${STAGES[p.stage + 1].name} ⭐`;
+      } else {
+        btn.innerText = `Phá Cảnh Tầng ${p.level + 1}`;
+      }
     } else {
-      btn.innerText = `Phá Cảnh Tầng ${p.level + 1}`;
+      btn.style.display = "none";
     }
-  } else {
-    btn.style.display = "none";
   }
 
   if (p.age >= p.maxAge && !p.isDead) {
@@ -121,9 +133,11 @@ export function updateUI() {
 export function showFactionChoiceModal() {
   p.pendingFactionChoice = true;
   writeLog("✨ Kì ngộ mở ra trước mắt. Hãy chọn phe bằng các nút hiển thị.", "highlight");
-  document.getElementById("faction-modal").classList.add("show");
+  const modal = document.getElementById("faction-modal");
+  if (modal) modal.classList.add("show");
 }
 
 export function hideFactionChoiceModal() {
-  document.getElementById("faction-modal").classList.remove("show");
+  const modal = document.getElementById("faction-modal");
+  if (modal) modal.classList.remove("show");
 }
