@@ -13,7 +13,7 @@ import {
   deleteSaveConfirm,
   refreshSaveHint
 } from "./save.js";
-import { updatePlayerBanner } from "./ui.js";
+import { updatePlayerBanner, updateInitUI } from "./ui.js";
 
 window.rollFate = rollFate;
 window.godMode = godMode;
@@ -33,4 +33,5 @@ window.deleteSaveConfirm = deleteSaveConfirm;
 });
 
 updatePlayerBanner();
+updateInitUI();
 refreshSaveHint();
